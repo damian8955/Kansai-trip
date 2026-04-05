@@ -3,6 +3,25 @@ const SHARED_SPOTS_PATHNAME = "shared/kansai-trip-spots.json";
 module.exports = async (req, res) => {
   const { put, head, del } = await import("@vercel/blob");
 
+  const isBlobNotFound = (error) => {
+    const errorText = [
+      error?.name,
+      error?.code,
+      error?.message,
+      error?.cause?.message,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return (
+      errorText.includes("not found") ||
+      errorText.includes("blobnotfound") ||
+      errorText.includes("nosuchkey") ||
+      errorText.includes("does not exist")
+    );
+  };
+
   if (req.method === "GET") {
     try {
       const blob = await head(SHARED_SPOTS_PATHNAME);
@@ -19,8 +38,8 @@ module.exports = async (req, res) => {
       const data = await response.json();
       return res.status(200).json({ spots: Array.isArray(data.spots) ? data.spots : [] });
     } catch (error) {
-      if (error?.message?.toLowerCase().includes("not found")) {
-        return res.status(404).json({ spots: [] });
+      if (isBlobNotFound(error)) {
+        return res.status(200).json({ spots: [] });
       }
 
       return res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
@@ -63,6 +82,10 @@ module.exports = async (req, res) => {
       await del(SHARED_SPOTS_PATHNAME);
       return res.status(200).json({ ok: true });
     } catch (error) {
+      if (isBlobNotFound(error)) {
+        return res.status(200).json({ ok: true });
+      }
+
       return res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   }
