@@ -82,6 +82,7 @@ const SPOTS_STORAGE_KEY = "kansai-trip-spots-v1";
 const PLACE_SEARCH_ENDPOINT = "/api/place-search";
 const PLACE_PHOTO_ENDPOINT = "/api/place-photo";
 const PUBLIC_CONFIG_ENDPOINT = "/api/public-config";
+const SHARED_SPOTS_ENDPOINT = "/api/shared-spots";
 let embedApiKeyPromise = null;
 
 function inferRegionFromLocation(lat, lng, name = "") {
@@ -293,10 +294,75 @@ function saveSpots() {
   );
 }
 
+function refreshSpotViews() {
+  saveSpots();
+  renderMarkers();
+  renderList();
+  renderSpotStage();
+  populateRouteSelectors();
+  renderPhotoCredits();
+}
+
+async function loadSharedSpots() {
+  const response = await fetch(SHARED_SPOTS_ENDPOINT, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("無法讀取共用景點資料");
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.spots) ? data.spots.map(normalizeSpot) : [];
+}
+
+async function saveSharedSpots() {
+  const response = await fetch(SHARED_SPOTS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      spots: spots.map((spot) => ({
+        name: spot.name,
+        lat: spot.lat,
+        lng: spot.lng,
+        region: spot.region,
+        image: spot.image,
+        imageAttribution: spot.imageAttribution,
+      })),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("無法儲存共用景點資料");
+  }
+}
+
+async function syncSharedSpots() {
+  saveSpots();
+
+  try {
+    await saveSharedSpots();
+  } catch (error) {
+    setFormStatus(error instanceof Error ? `${error.message}，目前先保存在這台裝置。` : "共用儲存失敗，目前先保存在這台裝置。");
+  }
+}
+
 const spots = loadSpots();
 
 const spotList = document.querySelector("#spot-list");
 const spotCount = document.querySelector("#spot-count");
+const exportSpotsButton = document.querySelector("#export-spots");
+const importSpotsButton = document.querySelector("#import-spots");
+const importSpotsFileInput = document.querySelector("#import-spots-file");
 const spotForm = document.querySelector("#spot-form");
 const spotNameInput = document.querySelector("#spot-name");
 const formStatus = document.querySelector("#form-status");
@@ -448,12 +514,65 @@ function deleteSpot(name) {
     selectedSpotName = spots[0]?.name ?? "";
   }
 
-  saveSpots();
-  renderMarkers();
-  renderList();
-  renderSpotStage();
-  populateRouteSelectors();
+  refreshSpotViews();
+  void syncSharedSpots();
   setFormStatus(`已刪除「${name}」`);
+}
+
+function exportSpots() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    spots: spots.map((spot) => ({
+      name: spot.name,
+      lat: spot.lat,
+      lng: spot.lng,
+      region: spot.region,
+      image: spot.image,
+      imageAttribution: spot.imageAttribution,
+    })),
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "kansai-trip-spots.json";
+  anchor.click();
+  URL.revokeObjectURL(url);
+  setFormStatus("已匯出景點清單。");
+}
+
+async function importSpotsFromFile(file) {
+  const content = await file.text();
+  const parsed = JSON.parse(content);
+  const importedSpots = Array.isArray(parsed) ? parsed : parsed.spots;
+
+  if (!Array.isArray(importedSpots) || importedSpots.length === 0) {
+    throw new Error("匯入檔案裡沒有可用的景點資料。");
+  }
+
+  spots.splice(0, spots.length, ...importedSpots.map(normalizeSpot));
+  selectedSpotName = spots[0]?.name || "";
+  refreshSpotViews();
+  await syncSharedSpots();
+  setFormStatus(`已匯入 ${spots.length} 個景點。`);
+}
+
+async function initializeSharedSpots() {
+  try {
+    const sharedSpots = await loadSharedSpots();
+
+    if (Array.isArray(sharedSpots) && sharedSpots.length > 0) {
+      spots.splice(0, spots.length, ...sharedSpots);
+      selectedSpotName = spots[0]?.name || "";
+      refreshSpotViews();
+      return;
+    }
+
+    await saveSharedSpots();
+  } catch {
+    setFormStatus("目前無法連到共用儲存，先使用這台裝置的本機資料。");
+  }
 }
 
 function applyFallbackImageState(card, region) {
@@ -674,11 +793,8 @@ spotForm.addEventListener("submit", async (event) => {
     const { lat, lng, raw } = await searchSpotLocation(name);
     const region = inferRegionFromSearchResult(raw, name);
     spots.push({ name, region, lat, lng, image: null, imageAttribution: "" });
-    saveSpots();
-    renderMarkers();
-    renderList();
-    renderSpotStage();
-    populateRouteSelectors();
+    refreshSpotViews();
+    await syncSharedSpots();
     spotForm.reset();
     setFormStatus(`已加入「${name}」`);
     selectSpot(name);
@@ -687,6 +803,29 @@ spotForm.addEventListener("submit", async (event) => {
     setFormStatus(error instanceof Error ? error.message : "新增失敗，請再試一次");
   } finally {
     submitButton.disabled = false;
+  }
+});
+
+exportSpotsButton.addEventListener("click", () => {
+  exportSpots();
+});
+
+importSpotsButton.addEventListener("click", () => {
+  importSpotsFileInput.click();
+});
+
+importSpotsFileInput.addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    await importSpotsFromFile(file);
+  } catch (error) {
+    setFormStatus(error instanceof Error ? error.message : "匯入失敗，請再試一次。");
+  } finally {
+    importSpotsFileInput.value = "";
   }
 });
 
@@ -724,3 +863,4 @@ renderSpotStage();
 populateRouteSelectors();
 renderPhotoCredits();
 routeEmbed.src = "";
+void initializeSharedSpots();

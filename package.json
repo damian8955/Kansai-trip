@@ -1,0 +1,8 @@
+{
+  "name": "kansai-trip",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@vercel/blob": "^1.1.1"
+  }
+}
