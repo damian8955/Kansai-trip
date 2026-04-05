@@ -74,36 +74,61 @@
             </details>
           </section>
           <div id="travel-map" class="travel-map" aria-label="關西旅行互動地圖"></div>
-          <section class="route-planner" aria-label="景點路線規劃">
-            <div class="route-planner__header">
+          <details class="weather-planner collapsible-panel" aria-label="景點天氣查詢">
+            <summary class="collapsible-panel__summary weather-planner__header">
+              <div>
+                <span class="board-label">Weather Lookup</span>
+                <h3>景點天氣查詢</h3>
+              </div>
+            </summary>
+            <div class="collapsible-panel__content">
+              <form id="weather-form" class="weather-form">
+                <label>
+                  景點
+                  <select id="weather-spot" name="spot"></select>
+                </label>
+                <label>
+                  日期
+                  <input id="weather-date" name="date" type="date" />
+                </label>
+                <button type="submit">查詢天氣</button>
+              </form>
+              <p id="weather-status" class="form-status" aria-live="polite"></p>
+              <div id="weather-result" class="weather-result" hidden></div>
+            </div>
+          </details>
+          <details class="route-planner collapsible-panel" aria-label="景點路線規劃">
+            <summary class="collapsible-panel__summary route-planner__header">
               <div>
                 <span class="board-label">Transit Planner</span>
                 <h3>景點到景點怎麼去</h3>
               </div>
+            </summary>
+            <div class="collapsible-panel__content">
+              <form id="route-form" class="route-form">
+                <label>
+                  起點
+                  <select id="route-origin" name="origin"></select>
+                </label>
+                <label>
+                  終點
+                  <select id="route-destination" name="destination"></select>
+                </label>
+                <button type="submit">顯示路線</button>
+              </form>
+              <p id="route-status" class="form-status" aria-live="polite"></p>
+              <div class="route-embed-shell">
+                <iframe
+                  id="route-embed"
+                  class="route-embed"
+                  title="Google Maps 大眾運輸路線"
+                  loading="lazy"
+                  referrerpolicy="no-referrer-when-downgrade"
+                  allowfullscreen
+                ></iframe>
+              </div>
             </div>
-            <form id="route-form" class="route-form">
-              <label>
-                起點
-                <select id="route-origin" name="origin"></select>
-              </label>
-              <label>
-                終點
-                <select id="route-destination" name="destination"></select>
-              </label>
-              <button type="submit">顯示路線</button>
-            </form>
-            <p id="route-status" class="form-status" aria-live="polite"></p>
-            <div class="route-embed-shell">
-              <iframe
-                id="route-embed"
-                class="route-embed"
-                title="Google Maps 大眾運輸路線"
-                loading="lazy"
-                referrerpolicy="no-referrer-when-downgrade"
-                allowfullscreen
-              ></iframe>
-            </div>
-          </section>
+          </details>
         </div>
       </main>
     </div>

@@ -37,15 +37,6 @@ const regionLabels = {
   Custom: "其他",
 };
 
-const regionDescriptions = {
-  Osaka: "城市感、夜生活和購物熱區",
-  Kyoto: "古寺與經典街景的文化區",
-  Nara: "古都寺社與寬闊公園氛圍",
-  Hyogo: "城堡、港灣與溫泉路線",
-  Stay: "這趟旅程的住宿與休息據點",
-  Custom: "旅途中另外加入的新景點",
-};
-
 const placeQueryOverrides = {
   "姬路城": "姬路城 Himeji Castle",
   "有馬溫泉": "有馬溫泉 Arima Onsen",
@@ -374,8 +365,75 @@ const routeOriginSelect = document.querySelector("#route-origin");
 const routeDestinationSelect = document.querySelector("#route-destination");
 const routeStatus = document.querySelector("#route-status");
 const routeEmbed = document.querySelector("#route-embed");
+const weatherForm = document.querySelector("#weather-form");
+const weatherSpotSelect = document.querySelector("#weather-spot");
+const weatherDateInput = document.querySelector("#weather-date");
+const weatherStatus = document.querySelector("#weather-status");
+const weatherResult = document.querySelector("#weather-result");
 let selectedSpotName = spots[0]?.name ?? "";
 const markerRegistry = new Map();
+
+const weatherCodeLabels = {
+  0: "晴朗",
+  1: "大致晴朗",
+  2: "局部多雲",
+  3: "陰天",
+  45: "霧",
+  48: "霧凇",
+  51: "小毛雨",
+  53: "毛雨",
+  55: "強毛雨",
+  56: "凍毛雨",
+  57: "強凍毛雨",
+  61: "小雨",
+  63: "降雨",
+  65: "大雨",
+  66: "凍雨",
+  67: "強凍雨",
+  71: "小雪",
+  73: "降雪",
+  75: "大雪",
+  77: "冰粒",
+  80: "陣雨",
+  81: "較強陣雨",
+  82: "強陣雨",
+  85: "陣雪",
+  86: "強陣雪",
+  95: "雷雨",
+  96: "雷雨夾冰雹",
+  99: "強雷雨夾冰雹",
+};
+
+const weatherCodeIcons = {
+  0: "☀",
+  1: "🌤",
+  2: "⛅",
+  3: "☁",
+  45: "🌫",
+  48: "🌫",
+  51: "🌦",
+  53: "🌦",
+  55: "🌧",
+  56: "🌧",
+  57: "🌧",
+  61: "🌧",
+  63: "🌧",
+  65: "🌧",
+  66: "🌧",
+  67: "🌧",
+  71: "🌨",
+  73: "🌨",
+  75: "❄",
+  77: "❄",
+  80: "🌦",
+  81: "🌧",
+  82: "⛈",
+  85: "🌨",
+  86: "❄",
+  95: "⛈",
+  96: "⛈",
+  99: "⛈",
+};
 
 const map = L.map("travel-map", {
   zoomControl: true,
@@ -474,6 +532,173 @@ function setRouteStatus(message) {
   routeStatus.textContent = message;
 }
 
+function setWeatherStatus(message) {
+  weatherStatus.textContent = message;
+}
+
+function formatWeatherDate(dateString) {
+  return new Intl.DateTimeFormat("zh-TW", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date(`${dateString}T00:00:00`));
+}
+
+function formatHourLabel(isoString) {
+  const date = new Date(isoString);
+  const hour = date.getHours();
+  return hour === 0 ? "12AM" : hour < 12 ? `${hour}AM` : hour === 12 ? "12PM" : `${hour - 12}PM`;
+}
+
+function formatSunEventLabel(isoString) {
+  const date = new Date(isoString);
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function buildPrecipitationChart(hourly) {
+  const values = hourly.map((entry) => Number(entry.precipitation_probability ?? 0));
+  const width = 760;
+  const height = 220;
+  const paddingTop = 20;
+  const paddingRight = 44;
+  const paddingBottom = 34;
+  const paddingLeft = 12;
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const points = values.map((value, index) => {
+    const x = paddingLeft + (chartWidth * index) / Math.max(values.length - 1, 1);
+    const y = paddingTop + chartHeight - (Math.min(Math.max(value, 0), 100) / 100) * chartHeight;
+    return { x, y, value, time: hourly[index].time };
+  });
+
+  const linePath = points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .join(" ");
+
+  const areaPath = points.length
+    ? `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${(paddingTop + chartHeight).toFixed(1)} L ${points[0].x.toFixed(1)} ${(paddingTop + chartHeight).toFixed(1)} Z`
+    : "";
+
+  const horizontalGuides = [0, 20, 40, 60, 80, 100]
+    .map((tick) => {
+      const y = paddingTop + chartHeight - (tick / 100) * chartHeight;
+      return `
+        <line x1="${paddingLeft}" y1="${y}" x2="${paddingLeft + chartWidth}" y2="${y}" class="precip-chart__grid-line" />
+        <text x="${width - 4}" y="${y + 5}" class="precip-chart__axis">${tick}%</text>
+      `;
+    })
+    .join("");
+
+  const xLabels = [0, 6, 12, 18, 23]
+    .filter((hourIndex) => hourly[hourIndex])
+    .map((hourIndex) => {
+      const x = paddingLeft + (chartWidth * hourIndex) / Math.max(values.length - 1, 1);
+      return `<text x="${x}" y="${height - 8}" text-anchor="middle" class="precip-chart__axis">${formatHourLabel(hourly[hourIndex].time)}</text>`;
+    })
+    .join("");
+
+  const dots = points
+    .map(
+      (point) => `
+        <circle cx="${point.x}" cy="${point.y}" r="3.5" class="precip-chart__dot">
+          <title>${formatHourLabel(point.time)} ${Math.round(point.value)}%</title>
+        </circle>
+      `,
+    )
+    .join("");
+
+  return `
+    <div class="precip-chart">
+      <div class="precip-chart__title">每小時降雨機率</div>
+      <div class="precip-chart__subtitle">${Math.max(...values, 0)}% 為當日最高機率</div>
+      <svg viewBox="0 0 ${width} ${height}" class="precip-chart__svg" role="img" aria-label="每小時降雨機率曲線圖">
+        <defs>
+          <linearGradient id="precip-area-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(156, 216, 255, 0.65)" />
+            <stop offset="100%" stop-color="rgba(156, 216, 255, 0.08)" />
+          </linearGradient>
+        </defs>
+        ${horizontalGuides}
+        <path d="${areaPath}" fill="url(#precip-area-gradient)" class="precip-chart__area"></path>
+        <path d="${linePath}" class="precip-chart__line"></path>
+        ${dots}
+        ${xLabels}
+      </svg>
+    </div>
+  `;
+}
+
+function renderWeatherResult(spot, dateString, payload) {
+  const { daily, hourly, sunset } = payload;
+  const weatherLabel = weatherCodeLabels[daily.weather_code] || "未知天氣";
+  const hourlyCards = hourly
+    .map(
+      (entry) => `
+        <div class="weather-hour">
+          <div class="weather-hour__time">${formatHourLabel(entry.time)}</div>
+          <div class="weather-hour__icon" aria-hidden="true">${weatherCodeIcons[entry.weather_code] || "☁"}</div>
+          <div class="weather-hour__temp">${Math.round(entry.temperature_2m)}°</div>
+        </div>
+      `,
+    )
+    .join("");
+
+  const sunsetCard = sunset
+    ? `
+      <div class="weather-hour weather-hour--sunset">
+        <div class="weather-hour__time">${formatSunEventLabel(sunset)}</div>
+        <div class="weather-hour__icon" aria-hidden="true">🌇</div>
+        <div class="weather-hour__temp">Sunset</div>
+      </div>
+    `
+    : "";
+
+  weatherResult.hidden = false;
+  weatherResult.innerHTML = `
+    <div class="weather-result__eyebrow">${regionLabels[spot.region] || spot.region}</div>
+    <div class="weather-result__title">${spot.name}</div>
+    <div class="weather-result__summary">${formatWeatherDate(dateString)}，預報為 ${weatherLabel}。</div>
+    <div class="weather-result__grid">
+      <div class="weather-result__stat">
+        <span class="weather-result__label">最高溫</span>
+        <span class="weather-result__value">${Math.round(daily.temperature_2m_max)}°C</span>
+      </div>
+      <div class="weather-result__stat">
+        <span class="weather-result__label">最低溫</span>
+        <span class="weather-result__value">${Math.round(daily.temperature_2m_min)}°C</span>
+      </div>
+      <div class="weather-result__stat">
+        <span class="weather-result__label">降雨機率</span>
+        <span class="weather-result__value">${Math.round(daily.precipitation_probability_max)}%</span>
+      </div>
+      <div class="weather-result__stat">
+        <span class="weather-result__label">降雨量</span>
+        <span class="weather-result__value">${Number(daily.precipitation_sum || 0).toFixed(1)} mm</span>
+      </div>
+    </div>
+    <div class="weather-timeline">
+      ${hourlyCards}
+      ${sunsetCard}
+    </div>
+    ${buildPrecipitationChart(hourly)}
+  `;
+}
+
 function renderPhotoCredits() {
   const creditedSpots = spots.filter((spot) => spot.imageAttribution);
   if (!creditedSpots.length) {
@@ -493,13 +718,20 @@ function populateRouteSelectors() {
   const options = spots.map((spot) => `<option value="${spot.name}">${spot.name}</option>`).join("");
   routeOriginSelect.innerHTML = options;
   routeDestinationSelect.innerHTML = options;
+  weatherSpotSelect.innerHTML = options;
 
   routeOriginSelect.value = spots[0]?.name || "";
   routeDestinationSelect.value = spots[1]?.name || spots[0]?.name || "";
+  weatherSpotSelect.value = selectedSpotName || spots[0]?.name || "";
 }
 
 
 function deleteSpot(name) {
+  const confirmed = window.confirm(`確定要刪除「${name}」嗎？`);
+  if (!confirmed) {
+    return;
+  }
+
   const index = spots.findIndex((spot) => spot.name === name);
   if (index === -1) {
     return;
@@ -547,17 +779,14 @@ function applyFallbackImageState(card, region) {
 
 function hydrateSpotCardImage(card, spot) {
   const image = card.querySelector(".spot-card-3d__image");
-  const meta = card.querySelector(".spot-card-3d__meta");
 
   if (spot.image) {
     image.hidden = false;
     image.src = spot.image;
-    meta.textContent = regionDescriptions[spot.region] || regionDescriptions.Custom;
     return;
   }
 
   applyFallbackImageState(card, spot.region);
-  meta.textContent = regionDescriptions[spot.region] || regionDescriptions.Custom;
 
   fetchGooglePlacePhoto(spot)
     .then((resolvedPhoto) => {
@@ -570,8 +799,6 @@ function hydrateSpotCardImage(card, spot) {
       saveSpots();
       image.hidden = false;
       image.src = resolvedPhoto.url;
-
-      meta.textContent = regionDescriptions[spot.region] || regionDescriptions.Custom;
       renderPhotoCredits();
     })
     .catch(() => {
@@ -599,7 +826,6 @@ function renderSpotStage() {
       </div>
       <span class="spot-card-3d__label">${regionLabels[spot.region] || spot.region}</span>
       <div class="spot-card-3d__name">${spot.name}</div>
-      <div class="spot-card-3d__meta">${regionDescriptions[spot.region] || regionDescriptions.Custom}</div>
     `;
 
     card.addEventListener("click", () => {
@@ -729,6 +955,59 @@ async function searchSpotLocation(name) {
   throw new Error("找不到這個景點，請換一個更完整的名稱試試看");
 }
 
+async function fetchWeatherForSpot(spot, dateString) {
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  url.searchParams.set("latitude", String(spot.lat));
+  url.searchParams.set("longitude", String(spot.lng));
+  url.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset");
+  url.searchParams.set("hourly", "temperature_2m,weather_code,precipitation_probability");
+  url.searchParams.set("timezone", "Asia/Tokyo");
+  url.searchParams.set("start_date", dateString);
+  url.searchParams.set("end_date", dateString);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("目前無法取得天氣資料。");
+  }
+
+  const data = await response.json();
+  const daily = data.daily;
+
+  if (!daily?.time?.length) {
+    throw new Error("這個日期目前還沒有可用的天氣資料。");
+  }
+
+  const hourlyTimes = Array.isArray(data.hourly?.time) ? data.hourly.time : [];
+  const hourlyTemperatures = Array.isArray(data.hourly?.temperature_2m) ? data.hourly.temperature_2m : [];
+  const hourlyCodes = Array.isArray(data.hourly?.weather_code) ? data.hourly.weather_code : [];
+  const hourlyPrecipitation = Array.isArray(data.hourly?.precipitation_probability) ? data.hourly.precipitation_probability : [];
+  const hourly = hourlyTimes
+    .map((time, index) => ({
+      time,
+      temperature_2m: hourlyTemperatures[index],
+      weather_code: hourlyCodes[index],
+      precipitation_probability: hourlyPrecipitation[index] ?? 0,
+    }))
+    .filter((entry) => entry.time.startsWith(dateString));
+
+  return {
+    daily: {
+      weather_code: daily.weather_code?.[0],
+      temperature_2m_max: daily.temperature_2m_max?.[0],
+      temperature_2m_min: daily.temperature_2m_min?.[0],
+      precipitation_probability_max: daily.precipitation_probability_max?.[0] ?? 0,
+      precipitation_sum: daily.precipitation_sum?.[0] ?? 0,
+    },
+    hourly,
+    sunset: daily.sunset?.[0] || "",
+  };
+}
+
 spotForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -761,6 +1040,35 @@ spotForm.addEventListener("submit", async (event) => {
     setFormStatus(error instanceof Error ? error.message : "新增失敗，請再試一次");
   } finally {
     submitButton.disabled = false;
+  }
+});
+
+weatherForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const spot = spots.find((entry) => entry.name === weatherSpotSelect.value);
+  const dateString = weatherDateInput.value;
+
+  if (!spot) {
+    setWeatherStatus("請先選擇一個景點。");
+    return;
+  }
+
+  if (!dateString) {
+    setWeatherStatus("請先選擇日期。");
+    return;
+  }
+
+  setWeatherStatus(`正在查詢 ${spot.name} 的天氣...`);
+  weatherResult.hidden = true;
+
+  try {
+    const daily = await fetchWeatherForSpot(spot, dateString);
+    renderWeatherResult(spot, dateString, daily);
+    setWeatherStatus("");
+  } catch (error) {
+    weatherResult.hidden = true;
+    setWeatherStatus(error instanceof Error ? error.message : "天氣查詢失敗，請稍後再試。");
   }
 });
 
@@ -798,4 +1106,6 @@ renderSpotStage();
 populateRouteSelectors();
 renderPhotoCredits();
 routeEmbed.src = "";
+weatherDateInput.value = new Date().toISOString().slice(0, 10);
+weatherResult.hidden = true;
 void initializeSharedSpots();
