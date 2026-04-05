@@ -1,16 +1,23 @@
 # Kansai Trip Map
 
-A shareable travel planning site for a Kansai trip. The app combines a zoomable map, 3D-style attraction cards, Google place photos, and embedded transit directions so a group can keep a shared list of places in one web app.
+A shareable trip-planning site for a Kansai itinerary. The app combines a zoomable map, 3D-style attraction cards, Google place search and photos, embedded transit directions, and date-based weather lookup in one lightweight web app.
+
+## Overview
+
+This project is designed for planning a group trip before day-by-day scheduling is finalized. Instead of focusing on a fixed route first, it helps collect attractions, visualize where they are, compare how to move between them, and quickly check weather for a selected place and date.
 
 ## Features
 
-- Zoomable Kansai map with linked attraction markers
-- 3D attraction card carousel with synced selection state
-- Add and delete attractions by name
-- Automatic place lookup and region detection
-- Google place photos with attribution
-- Embedded Google Maps transit directions between two selected spots
-- Shared cloud-backed spot list across browsers and devices
+- Zoomable Kansai map with synced attraction markers
+- 3D attraction card stage linked with the map and side list
+- Add attractions by name with automatic place lookup
+- Delete attractions with confirmation to avoid accidental removal
+- Shared cloud-backed attraction list across browsers and devices
+- Google place photos with a collapsible attribution panel
+- Embedded Google Maps transit directions between two selected attractions
+- Date-based weather lookup with daily summary
+- Hourly weather timeline and hourly precipitation chance chart
+- Collapsible weather and transit sections to keep the page compact
 
 ## Tech Stack
 
@@ -18,6 +25,7 @@ A shareable travel planning site for a Kansai trip. The app combines a zoomable 
 - Map: Leaflet + OpenStreetMap tiles
 - Place search and photos: Google Places API via Vercel serverless functions
 - Embedded directions: Google Maps Embed API
+- Weather: Open-Meteo forecast API
 - Shared storage: Vercel Blob
 - Deployment: Vercel
 
@@ -35,14 +43,33 @@ A shareable travel planning site for a Kansai trip. The app combines a zoomable 
 ├── script.js
 ├── styles.css
 ├── package.json
+├── README.md
 └── .env.example
 ```
 
-## How Data Works
+## How It Works
 
-- The main attraction list is stored in Vercel Blob so all visitors to the deployed site can share one list.
+### Attractions
+
+- The app starts from a default spot list defined in `script.js`.
+- New attractions are searched by name and then converted into stored spots with name, region, coordinates, and image metadata.
+- Deleting a spot removes it from the shared list after a confirmation step.
+
+### Shared Data
+
+- The main spot list is stored in Vercel Blob so visitors on the deployed site can share one common attraction list.
 - The browser also keeps a local cache in `localStorage` as a fallback.
-- If shared storage is temporarily unavailable, the app continues to work with local data on that device.
+- If shared storage is temporarily unavailable, the site can still work with local data on that device.
+
+### Weather
+
+- Weather results are fetched from Open-Meteo using the selected spot coordinates and date.
+- The UI shows a daily summary, hourly forecast strip, and an hourly precipitation probability chart.
+
+### Transit
+
+- The route planner embeds Google Maps transit directions for the selected origin and destination.
+- The route panel is intentionally lightweight and relies on the embedded Google Maps experience rather than rebuilding the full Google transit UI in-page.
 
 ## Environment Variables
 
@@ -54,7 +81,7 @@ GOOGLE_MAPS_EMBED_API_KEY=your_google_maps_embed_api_key
 BLOB_READ_WRITE_TOKEN=your_vercel_blob_read_write_token
 ```
 
-### What each variable is for
+### Variable Guide
 
 - `GOOGLE_MAPS_API_KEY`
   Used by the serverless functions for Google Places search and place photos.
@@ -63,7 +90,7 @@ BLOB_READ_WRITE_TOKEN=your_vercel_blob_read_write_token
   Used for the embedded Google Maps directions iframe.
 
 - `BLOB_READ_WRITE_TOKEN`
-  Used by the shared storage API to read and write the common attraction list.
+  Used by the shared storage API to read and write the shared attraction list.
 
 ## Local Development
 
@@ -93,27 +120,27 @@ vercel dev
    - `GOOGLE_MAPS_API_KEY`
    - `GOOGLE_MAPS_EMBED_API_KEY`
    - `BLOB_READ_WRITE_TOKEN`
-4. Create and connect a Vercel Blob store to the project if you have not already.
-5. Redeploy the project.
+4. Create and connect a Vercel Blob store to the project.
+5. Redeploy the project after environment variables or storage are added.
 
 ## Google Cloud Setup
 
-You should use two separate Google API keys:
+Use two separate Google API keys.
 
-### 1. Server key
+### Server Key
 
 Use this for `GOOGLE_MAPS_API_KEY`.
 
 - Enable `Places API (New)`
-- Restrict the key to only the APIs needed by the backend
+- Restrict the key to only the backend APIs you need
 
-### 2. Embed key
+### Embed Key
 
 Use this for `GOOGLE_MAPS_EMBED_API_KEY`.
 
 - Enable `Maps Embed API`
 - Set `Application restrictions` to `HTTP referrers`
-- Allow only your production domain, for example:
+- Allow only your deployment domains, for example:
 
 ```text
 https://your-project.vercel.app/*
@@ -121,11 +148,17 @@ https://your-project.vercel.app/*
 
 - Set `API restrictions` to `Maps Embed API` only
 
-## Notes
+## Security Notes
 
 - The server-side Google key and Blob token are not stored in the repository.
 - The embed key is intentionally separate because embedded Google Maps must run in the browser.
-- This project does not require a frontend framework or build step.
+- The embed key should always be restricted by referrer and API scope.
+
+## Development Notes
+
+- The project does not require a frontend framework or build step.
+- Weather data is client-side and depends on the selected coordinates and the forecast range available from Open-Meteo.
+- Shared spot data depends on Vercel Blob being connected and `BLOB_READ_WRITE_TOKEN` being available at runtime.
 
 ## License
 
