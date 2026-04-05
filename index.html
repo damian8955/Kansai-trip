@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>關西暑假旅行地圖</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="control-panel">
+        <div class="eyebrow">Kansai Summer Trip</div>
+        <h1>7/3 - 7/16 關西旅行景點地圖</h1>
+
+        <section class="trip-card">
+          <div class="trip-card__row">
+            <span>旅行期間</span>
+            <strong>2026/07/03 - 2026/07/16</strong>
+          </div>
+          <div class="trip-card__row">
+            <span>目前景點數</span>
+            <strong id="spot-count">0</strong>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">新增景點</div>
+          <form id="spot-form" class="spot-form">
+            <label>
+              景點名稱
+              <input id="spot-name" name="name" type="text" placeholder="例如：宇治平等院" required />
+            </label>
+
+            <button type="submit">加入地圖</button>
+          </form>
+          <p id="form-status" class="form-status" aria-live="polite"></p>
+          <p class="hint">
+            小提醒：現在只要輸入景點名稱，系統會自動搜尋位置、加入地圖，並判斷它屬於哪個區域。
+          </p>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">景點清單</div>
+          <ul id="spot-list" class="spot-list"></ul>
+        </section>
+      </aside>
+
+      <main class="map-experience">
+        <div class="map-stage">
+          <div class="map-toolbar">
+            <div>
+              <span class="board-label">Interactive Map</span>
+              <h2>關西景點總覽</h2>
+            </div>
+          </div>
+          <section class="spot-stage" aria-label="景點 3D 展示">
+            <div class="spot-stage__header">
+              <div>
+                <span class="board-label">3D Spotlight</span>
+                <h3 id="spot-stage-title">關西景點立體展示</h3>
+              </div>
+              <p id="spot-stage-region"></p>
+            </div>
+            <div id="spot-stage-track" class="spot-stage__track"></div>
+            <details id="photo-credits-panel" class="photo-credits-panel">
+              <summary>查看照片來源</summary>
+              <div id="photo-credits" class="photo-credits"></div>
+            </details>
+          </section>
+          <div id="travel-map" class="travel-map" aria-label="關西旅行互動地圖"></div>
+          <section class="route-planner" aria-label="景點路線規劃">
+            <div class="route-planner__header">
+              <div>
+                <span class="board-label">Transit Planner</span>
+                <h3>景點到景點怎麼去</h3>
+              </div>
+            </div>
+            <form id="route-form" class="route-form">
+              <label>
+                起點
+                <select id="route-origin" name="origin"></select>
+              </label>
+              <label>
+                終點
+                <select id="route-destination" name="destination"></select>
+              </label>
+              <button type="submit">顯示路線</button>
+            </form>
+            <p id="route-status" class="form-status" aria-live="polite"></p>
+            <div class="route-embed-shell">
+              <iframe
+                id="route-embed"
+                class="route-embed"
+                title="Google Maps 大眾運輸路線"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                allowfullscreen
+              ></iframe>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./script.js"></script>
+  </body>
+</html>
