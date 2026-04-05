@@ -360,9 +360,6 @@ const spots = loadSpots();
 
 const spotList = document.querySelector("#spot-list");
 const spotCount = document.querySelector("#spot-count");
-const exportSpotsButton = document.querySelector("#export-spots");
-const importSpotsButton = document.querySelector("#import-spots");
-const importSpotsFileInput = document.querySelector("#import-spots-file");
 const spotForm = document.querySelector("#spot-form");
 const spotNameInput = document.querySelector("#spot-name");
 const formStatus = document.querySelector("#form-status");
@@ -517,45 +514,6 @@ function deleteSpot(name) {
   refreshSpotViews();
   void syncSharedSpots();
   setFormStatus(`已刪除「${name}」`);
-}
-
-function exportSpots() {
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    spots: spots.map((spot) => ({
-      name: spot.name,
-      lat: spot.lat,
-      lng: spot.lng,
-      region: spot.region,
-      image: spot.image,
-      imageAttribution: spot.imageAttribution,
-    })),
-  };
-
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "kansai-trip-spots.json";
-  anchor.click();
-  URL.revokeObjectURL(url);
-  setFormStatus("已匯出景點清單。");
-}
-
-async function importSpotsFromFile(file) {
-  const content = await file.text();
-  const parsed = JSON.parse(content);
-  const importedSpots = Array.isArray(parsed) ? parsed : parsed.spots;
-
-  if (!Array.isArray(importedSpots) || importedSpots.length === 0) {
-    throw new Error("匯入檔案裡沒有可用的景點資料。");
-  }
-
-  spots.splice(0, spots.length, ...importedSpots.map(normalizeSpot));
-  selectedSpotName = spots[0]?.name || "";
-  refreshSpotViews();
-  await syncSharedSpots();
-  setFormStatus(`已匯入 ${spots.length} 個景點。`);
 }
 
 async function initializeSharedSpots() {
@@ -803,29 +761,6 @@ spotForm.addEventListener("submit", async (event) => {
     setFormStatus(error instanceof Error ? error.message : "新增失敗，請再試一次");
   } finally {
     submitButton.disabled = false;
-  }
-});
-
-exportSpotsButton.addEventListener("click", () => {
-  exportSpots();
-});
-
-importSpotsButton.addEventListener("click", () => {
-  importSpotsFileInput.click();
-});
-
-importSpotsFileInput.addEventListener("change", async (event) => {
-  const file = event.target.files?.[0];
-  if (!file) {
-    return;
-  }
-
-  try {
-    await importSpotsFromFile(file);
-  } catch (error) {
-    setFormStatus(error instanceof Error ? error.message : "匯入失敗，請再試一次。");
-  } finally {
-    importSpotsFileInput.value = "";
   }
 });
 
